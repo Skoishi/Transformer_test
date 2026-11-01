@@ -140,14 +140,19 @@ class MultiHeadSelfAttention(nn.Module):
         # 4) probs = softmax(scores, dim=-1)
         # 5) context = probs @ v -> reshape to (B, L, d_model)
         # 6) return out_proj(context)
-        
+
         B, L, _ = x.shape
 
         # 1) TODO: Project to Q, K, V and reshape/split heads
         # (B, L, d_model) -> (B, nhead, L, head_dim)
-       
+        Q_x=self.q_proj(x)
+        K_x=self.k_proj(x)
+        V_x=self.v_proj(x)
+        Q_x=self._split_heads(Q_x)
+        K_x=self._split_heads(K_x)
+        V_x=self._split_heads(V_x)
         # 2) TODO: Scaled dot-product attention scores: (B, nhead, L, L)
-
+        scores=torch.matmul(Q_x, K_x.transpose(-2, -1)) / self.scale
         # 3) Add masks (expect [L, L]) (done for you)
         if attn_mask is not None:
             scores = scores + attn_mask.view(1, 1, L, L)
@@ -164,10 +169,12 @@ class MultiHeadSelfAttention(nn.Module):
             scores = torch.where(mask_all_inf, torch.zeros_like(scores), scores)
 
         # 4) TODO: Softmax over keys
-
+        probs=F.softmax(scores, dim=-1)
         # 5) TODO: Context and merge heads
-
+        context=torch.matmul(probs, V_x)
+        context=self._merge_heads(context)
         # 6) TODO: Output projection
+        out=self.out_proj(context)
 
         return out
 
@@ -196,9 +203,9 @@ class DecoderBlock(nn.Module):
         # z = y + Linear(ReLU(Linear(LayerNorm(y))))
 
         # TODO: Self-attention with Pre-LN and residual
-
+        y = x + self.sa(self.ln1(x), attn_mask, key_padding_mask)
         # TODO: MLP with Pre-LN and residual
-        
+        z = y + self.fc2(self.act(self.fc1(self.ln2(y))))
         return z
 
 class TransformerSeq2Seq(nn.Module):
