@@ -301,8 +301,13 @@ class TransformerSeq2Seq(nn.Module):
         attn_mask = self.build_prefix_causal_mask(S, Lt, device)  # [L, L]
 
         # 5) TODO: Run through decoder blocks
+        for layer in self.layers:
+            X = layer(X, attn_mask, key_padding_mask)
 
         # 6) TODO: Slice target states and project to logits
-
+        #Take Y_tgt = output[:, S:, :] and project -> logits[B, T-1, V]
+        Y_tgt = X[:, S:, :]
         # 7) TODO: Return logits only for target positions: [B, T-1, V]
+        logits = self.output_proj(Y_tgt)
+        
         return logits
